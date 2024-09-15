@@ -121,6 +121,16 @@ fn parse_org_flag(str: &str) -> Option<u16> {
     None
 }
 
+fn parse_number<T: num::Integer + std::str::FromStr>(str: &str) -> Option<T> {
+    if let Some(hex_number) = str.strip_prefix('$') {
+        Some(T::from_str_radix(hex_number, 16).ok().unwrap())
+    } else if let Ok(num) = str.parse::<T>() {
+        Some(num)
+    } else {
+        None
+    }
+}
+
 fn parse_instruction(str: &str) -> Option<Instruction> {
     let line_splited = str.split(" ").collect::<Vec<&str>>();
     let keyword = line_splited[0];
@@ -145,21 +155,16 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
             let addressing_mode;
             let linked_data;
             let data_trimmed = data_str.trim_ascii().to_string();
-            match data_trimmed.chars().next().unwrap() {
-                '#' => {
-                    let value = data_trimmed.replace("#", "").parse::<u8>().unwrap();
-                    addressing_mode = AddressingMode::Immediate;
-                    linked_data = InstructionLinkedData::Immediate(value);
-                }
-                '$' => {
-                    let value = data_trimmed.replace("$", "").parse::<u16>().unwrap();
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::Relative(value);
-                }
-                _ => {
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
-                }
+            if data_trimmed.starts_with("#") {
+                let value = parse_number::<u8>(data_trimmed.replace("#", "").as_str()).unwrap();
+                addressing_mode = AddressingMode::Immediate;
+                linked_data = InstructionLinkedData::Immediate(value);
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str()) {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = InstructionLinkedData::Relative(value);
+            } else {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
             }
             Some(Instruction {
                 opcode: Opcode::Load,

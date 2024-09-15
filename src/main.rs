@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_load_relative() {
-        let intermediate_representation_opt = token::IntermediateRepresentation::new("load x,$4660\r\nhalt\r\n");
+        let intermediate_representation_opt = token::IntermediateRepresentation::new("load x,$1234\r\nhalt\r\n");
         assert!(intermediate_representation_opt.is_some());
 
         let intermediate_representation = intermediate_representation_opt.unwrap();
