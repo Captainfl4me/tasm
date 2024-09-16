@@ -35,17 +35,25 @@ enum MathOperand {
     Increment = 0,
     Add = 1,
     Sub = 2,
-    ShiftLeft = 3,
-    ShiftRight = 4,
+    And = 3,
+    Or = 4,
+    Eor = 5,
+    ShiftLeft = 6,
+    ShiftRight = 7,
 }
 
 #[derive(Clone, Copy)]
 #[repr(u8)]
 enum BranchCondition {
-    CarryFlag = 0,
-    ZeroFlag = 1,
-    NegativeFlag = 2,
-    OverflowFlag = 3,
+    NoCondition = 0,
+    CarryFlagClear = 1,
+    CarryFlagSet = 2,
+    ZeroFlagClear = 3,
+    ZeroFlagSet = 4,
+    NegativeFlagClear = 5,
+    NegativeFlagSet = 6,
+    OverflowFlagClear = 7,
+    OverflowFlagSet = 8,
 }
 
 #[derive(Clone, Copy)]
@@ -159,7 +167,8 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 let value = parse_number::<u8>(data_trimmed.replace("#", "").as_str()).unwrap();
                 addressing_mode = AddressingMode::Immediate;
                 linked_data = InstructionLinkedData::Immediate(value);
-            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str()) {
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+            {
                 addressing_mode = AddressingMode::Relative;
                 linked_data = InstructionLinkedData::Relative(value);
             } else {
@@ -195,11 +204,198 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
             register_2.as_ref()?;
 
             Some(Instruction {
-                opcode: Opcode::Load,
+                opcode: Opcode::Transfer,
                 addressing_mode: AddressingMode::Immediate,
                 data: InstructionData::DoubleRegisters(register_1.unwrap(), register_2.unwrap()),
                 size: 1,
                 linked_data: None,
+            })
+        }
+        "store" => {
+            let (register_str, data_str) = line_splited[1].split_once(",").unwrap();
+            let register: Option<Registers> = match register_str {
+                "x" => Some(Registers::XReg),
+                "y" => Some(Registers::YReg),
+                "a" => Some(Registers::Accumulator),
+                _ => None,
+            };
+            register.as_ref()?;
+
+            let addressing_mode;
+            let linked_data;
+            let data_trimmed = data_str.trim_ascii().to_string();
+            if data_trimmed.starts_with("#") {
+                eprintln!("ERR: Store cannot be immediate, expect address");
+                return None;
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+            {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = InstructionLinkedData::Relative(value);
+            } else {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
+            }
+            Some(Instruction {
+                opcode: Opcode::Store,
+                data: InstructionData::Registers(register.unwrap()),
+                size: 3,
+                linked_data: Some(linked_data),
+                addressing_mode,
+            })
+        }
+        "push" => {
+            let register_str = line_splited[1];
+            let register: Option<Registers> = match register_str {
+                "x" => Some(Registers::XReg),
+                "y" => Some(Registers::YReg),
+                "a" => Some(Registers::Accumulator),
+                _ => None,
+            };
+            register.as_ref()?;
+
+            Some(Instruction {
+                opcode: Opcode::Push,
+                data: InstructionData::Registers(register.unwrap()),
+                size: 1,
+                linked_data: None,
+                addressing_mode: AddressingMode::Immediate,
+            })
+        }
+        "pull" => {
+            let register_str = line_splited[1];
+            let register: Option<Registers> = match register_str {
+                "x" => Some(Registers::XReg),
+                "y" => Some(Registers::YReg),
+                "a" => Some(Registers::Accumulator),
+                _ => None,
+            };
+            register.as_ref()?;
+
+            Some(Instruction {
+                opcode: Opcode::Pull,
+                data: InstructionData::Registers(register.unwrap()),
+                size: 1,
+                linked_data: None,
+                addressing_mode: AddressingMode::Immediate,
+            })
+        }
+        "incr" => {
+            let addressing_mode;
+            let linked_data;
+            let data_trimmed = line_splited[1].trim_ascii().to_string();
+            if data_trimmed.starts_with("#") {
+                eprintln!("ERR: Incr cannot be immediate, expect address");
+                return None;
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+            {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::Relative(value));
+            } else {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::NotResolvedRelative(
+                    line_splited[1].trim_ascii(),
+                ));
+            }
+
+            Some(Instruction {
+                opcode: Opcode::Math,
+                data: InstructionData::MathOperand(MathOperand::Increment),
+                size: 3,
+                linked_data,
+                addressing_mode,
+            })
+        }
+        "add" | "sub" | "and" | "or" | "eor" => {
+            let addressing_mode;
+            let linked_data;
+            let data_trimmed = line_splited[1].trim_ascii().to_string();
+            if data_trimmed.starts_with("#") {
+                let value = parse_number::<u8>(data_trimmed.replace("#", "").as_str()).unwrap();
+                addressing_mode = AddressingMode::Immediate;
+                linked_data = Some(InstructionLinkedData::Immediate(value));
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+            {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::Relative(value));
+            } else {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::NotResolvedRelative(
+                    line_splited[1].trim_ascii(),
+                ));
+            }
+
+            let math_op = match keyword {
+                "add" => Some(MathOperand::Add),
+                "sub" => Some(MathOperand::Sub),
+                "and" => Some(MathOperand::And),
+                "or" => Some(MathOperand::Or),
+                "eor" => Some(MathOperand::Eor),
+                _ => None,
+            };
+
+            math_op.map(|math_op| Instruction {
+                opcode: Opcode::Math,
+                data: InstructionData::MathOperand(math_op),
+                size: 3,
+                linked_data,
+                addressing_mode,
+            })
+        }
+        "shift_right" => {
+            Some(Instruction {
+                opcode: Opcode::Math,
+                data: InstructionData::MathOperand(MathOperand::ShiftRight),
+                size: 1,
+                linked_data: None,
+                addressing_mode : AddressingMode::Immediate,
+            })
+        }
+        "shift_left" => {
+            Some(Instruction {
+                opcode: Opcode::Math,
+                data: InstructionData::MathOperand(MathOperand::ShiftLeft),
+                size: 1,
+                linked_data: None,
+                addressing_mode : AddressingMode::Immediate,
+            })
+        }
+        "jump" | "bcc" | "bcs" | "bzc" | "bzs" | "bnc" | "bns" | "boc" | "bos" => {
+            let addressing_mode;
+            let linked_data;
+            let data_trimmed = line_splited[1].trim_ascii().to_string();
+            if data_trimmed.starts_with("#") {
+                eprintln!("ERR: Jump cannot be immediate, expect address");
+                return None;
+            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+            {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::Relative(value));
+            } else {
+                addressing_mode = AddressingMode::Relative;
+                linked_data = Some(InstructionLinkedData::NotResolvedRelative(
+                    line_splited[1].trim_ascii(),
+                ));
+            }
+
+            let branch_condition = match keyword {
+                "jump" => Some(BranchCondition::NoCondition),
+                "bcc" => Some(BranchCondition::CarryFlagClear),
+                "bcs" => Some(BranchCondition::CarryFlagSet),
+                "bzc" => Some(BranchCondition::ZeroFlagClear),
+                "bzs" => Some(BranchCondition::ZeroFlagSet),
+                "bnc" => Some(BranchCondition::NegativeFlagClear),
+                "bns" => Some(BranchCondition::NegativeFlagSet),
+                "boc" => Some(BranchCondition::OverflowFlagClear),
+                "bos" => Some(BranchCondition::OverflowFlagSet),
+                _ => None
+            };
+
+            branch_condition.map(|branch_condition| Instruction {
+                opcode: Opcode::Jump,
+                data: InstructionData::BranchCondition(branch_condition),
+                size: 3,
+                linked_data,
+                addressing_mode,
             })
         }
         _ => None,
