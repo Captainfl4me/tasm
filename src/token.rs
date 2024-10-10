@@ -24,9 +24,10 @@ enum AddressingMode {
 #[derive(Clone, Copy)]
 #[repr(u8)]
 enum Registers {
-    Accumulator = 0,
-    XReg = 1,
-    YReg = 2,
+    Ra = 0,
+    Rx = 1,
+    Ry = 2,
+    Rb = 3,
 }
 
 #[derive(Clone, Copy)]
@@ -153,9 +154,10 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
         "load" => {
             let (register_str, data_str) = line_splited[1].split_once(",").unwrap();
             let register: Option<Registers> = match register_str {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register.as_ref()?;
@@ -189,16 +191,18 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
         "tf" => {
             let (register_str_1, register_str_2) = line_splited[1].split_once(",").unwrap();
             let register_1: Option<Registers> = match register_str_1 {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register_1.as_ref()?;
             let register_2: Option<Registers> = match register_str_2 {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register_2.as_ref()?;
@@ -214,9 +218,10 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
         "store" => {
             let (register_str, data_str) = line_splited[1].split_once(",").unwrap();
             let register: Option<Registers> = match register_str {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register.as_ref()?;
@@ -246,9 +251,10 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
         "push" => {
             let register_str = line_splited[1];
             let register: Option<Registers> = match register_str {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register.as_ref()?;
@@ -264,9 +270,10 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
         "pull" => {
             let register_str = line_splited[1];
             let register: Option<Registers> = match register_str {
-                "x" => Some(Registers::XReg),
-                "y" => Some(Registers::YReg),
-                "a" => Some(Registers::Accumulator),
+                "rx" => Some(Registers::Rx),
+                "ry" => Some(Registers::Ry),
+                "ra" => Some(Registers::Ra),
+                "rb" => Some(Registers::Rb),
                 _ => None,
             };
             register.as_ref()?;
@@ -280,48 +287,23 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
             })
         }
         "incr" => {
-            let addressing_mode;
-            let linked_data;
-            let data_trimmed = line_splited[1].trim_ascii().to_string();
-            if data_trimmed.starts_with("#") {
-                eprintln!("ERR: Incr cannot be immediate, expect address");
+            if line_splited.len() > 1 {
+                eprintln!("ERR: Incr only apply to RA");
                 return None;
-            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
-            {
-                addressing_mode = AddressingMode::Relative;
-                linked_data = Some(InstructionLinkedData::Relative(value));
-            } else {
-                addressing_mode = AddressingMode::Relative;
-                linked_data = Some(InstructionLinkedData::NotResolvedRelative(
-                    line_splited[1].trim_ascii(),
-                ));
             }
 
             Some(Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(MathOperand::Increment),
-                size: 3,
-                linked_data,
-                addressing_mode,
+                size: 1,
+                linked_data: None,
+                addressing_mode: AddressingMode::Immediate,
             })
         }
         "add" | "sub" | "and" | "or" | "eor" => {
-            let addressing_mode;
-            let linked_data;
-            let data_trimmed = line_splited[1].trim_ascii().to_string();
-            if data_trimmed.starts_with("#") {
-                let value = parse_number::<u8>(data_trimmed.replace("#", "").as_str()).unwrap();
-                addressing_mode = AddressingMode::Immediate;
-                linked_data = Some(InstructionLinkedData::Immediate(value));
-            } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
-            {
-                addressing_mode = AddressingMode::Relative;
-                linked_data = Some(InstructionLinkedData::Relative(value));
-            } else {
-                addressing_mode = AddressingMode::Relative;
-                linked_data = Some(InstructionLinkedData::NotResolvedRelative(
-                    line_splited[1].trim_ascii(),
-                ));
+            if line_splited.len() > 1 {
+                eprintln!("ERR: Math operand only apply between RA and RB");
+                return None;
             }
 
             let math_op = match keyword {
@@ -336,9 +318,9 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
             math_op.map(|math_op| Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(math_op),
-                size: 3,
-                linked_data,
-                addressing_mode,
+                size: 1,
+                linked_data: None,
+                addressing_mode: AddressingMode::Immediate,
             })
         }
         "shift_right" => {
