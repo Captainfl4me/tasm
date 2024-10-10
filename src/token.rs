@@ -121,13 +121,18 @@ fn parse_label_name(str: &str) -> Option<&str> {
     None
 }
 
-fn parse_org_flag(str: &str) -> Option<u16> {
-    let re = Regex::new(r"^.org\s$[0-9]").unwrap();
-    if re.captures(str).is_some() {
-        let org_addr = str.split("$").collect::<Vec<&str>>()[1];
-        return Some(org_addr.parse::<u16>().unwrap());
+fn parse_org_flag(str: &str) -> Option<Result<u16, String>> {
+    let line_splited = str.split(" ").collect::<Vec<&str>>();
+    let keyword = line_splited[0];
+    if keyword == ".org" {
+        if let Some(addr) = parse_number::<u16>(line_splited[1]) {
+            Some(Ok(addr))
+        } else {
+            Some(Err(format!("ERR: Cannot parse address: {}", line_splited[1])))
+        }
+    } else {
+        None
     }
-    None
 }
 
 fn parse_number<T: num::Integer + std::str::FromStr>(str: &str) -> Option<T> {
@@ -140,17 +145,17 @@ fn parse_number<T: num::Integer + std::str::FromStr>(str: &str) -> Option<T> {
     }
 }
 
-fn parse_instruction(str: &str) -> Option<Instruction> {
+fn parse_instruction(str: &str) -> Option<Result<Instruction, String>> {
     let line_splited = str.split(" ").collect::<Vec<&str>>();
     let keyword = line_splited[0];
     match keyword {
-        "halt" => Some(Instruction {
+        "halt" => Some(Ok(Instruction {
             opcode: Opcode::Break,
             addressing_mode: AddressingMode::Immediate,
             data: InstructionData::NoData,
             size: 1,
             linked_data: None,
-        }),
+        })),
         "load" => {
             let (register_str, data_str) = line_splited[1].split_once(",").unwrap();
             let register: Option<Registers> = match register_str {
@@ -160,7 +165,9 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register.as_ref()?;
+            if register.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str)))
+            }
 
             let addressing_mode;
             let linked_data;
@@ -177,7 +184,7 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 addressing_mode = AddressingMode::Relative;
                 linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
             }
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Load,
                 data: InstructionData::Registers(register.unwrap()),
                 size: match addressing_mode {
@@ -186,7 +193,7 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 },
                 linked_data: Some(linked_data),
                 addressing_mode,
-            })
+            }))
         }
         "tf" => {
             let (register_str_1, register_str_2) = line_splited[1].split_once(",").unwrap();
@@ -197,7 +204,10 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register_1.as_ref()?;
+            if register_1.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str_1)))
+            }
+
             let register_2: Option<Registers> = match register_str_2 {
                 "rx" => Some(Registers::Rx),
                 "ry" => Some(Registers::Ry),
@@ -205,15 +215,17 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register_2.as_ref()?;
+            if register_1.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str_2)))
+            }
 
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Transfer,
                 addressing_mode: AddressingMode::Immediate,
                 data: InstructionData::DoubleRegisters(register_1.unwrap(), register_2.unwrap()),
                 size: 1,
                 linked_data: None,
-            })
+            }))
         }
         "store" => {
             let (register_str, data_str) = line_splited[1].split_once(",").unwrap();
@@ -224,7 +236,9 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register.as_ref()?;
+            if register.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str)))
+            }
 
             let addressing_mode;
             let linked_data;
@@ -240,13 +254,13 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 addressing_mode = AddressingMode::Relative;
                 linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
             }
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Store,
                 data: InstructionData::Registers(register.unwrap()),
                 size: 3,
                 linked_data: Some(linked_data),
                 addressing_mode,
-            })
+            }))
         }
         "push" => {
             let register_str = line_splited[1];
@@ -257,15 +271,17 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register.as_ref()?;
+            if register.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str)))
+            }
 
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Push,
                 data: InstructionData::Registers(register.unwrap()),
                 size: 1,
                 linked_data: None,
                 addressing_mode: AddressingMode::Immediate,
-            })
+            }))
         }
         "pull" => {
             let register_str = line_splited[1];
@@ -276,15 +292,17 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 "rb" => Some(Registers::Rb),
                 _ => None,
             };
-            register.as_ref()?;
+            if register.is_none() {
+                return Some(Err(format!("ERR: unknow register: {}", register_str)))
+            }
 
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Pull,
                 data: InstructionData::Registers(register.unwrap()),
                 size: 1,
                 linked_data: None,
                 addressing_mode: AddressingMode::Immediate,
-            })
+            }))
         }
         "incr" => {
             if line_splited.len() > 1 {
@@ -292,13 +310,13 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 return None;
             }
 
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(MathOperand::Increment),
                 size: 1,
                 linked_data: None,
                 addressing_mode: AddressingMode::Immediate,
-            })
+            }))
         }
         "add" | "sub" | "and" | "or" | "eor" => {
             if line_splited.len() > 1 {
@@ -315,39 +333,38 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 _ => None,
             };
 
-            math_op.map(|math_op| Instruction {
+            math_op.map(|math_op| Ok(Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(math_op),
                 size: 1,
                 linked_data: None,
                 addressing_mode: AddressingMode::Immediate,
-            })
+            }))
         }
         "shift_right" => {
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(MathOperand::ShiftRight),
                 size: 1,
                 linked_data: None,
                 addressing_mode : AddressingMode::Immediate,
-            })
+            }))
         }
         "shift_left" => {
-            Some(Instruction {
+            Some(Ok(Instruction {
                 opcode: Opcode::Math,
                 data: InstructionData::MathOperand(MathOperand::ShiftLeft),
                 size: 1,
                 linked_data: None,
                 addressing_mode : AddressingMode::Immediate,
-            })
+            }))
         }
         "jump" | "bcc" | "bcs" | "bzc" | "bzs" | "bnc" | "bns" | "boc" | "bos" => {
             let addressing_mode;
             let linked_data;
             let data_trimmed = line_splited[1].trim_ascii().to_string();
             if data_trimmed.starts_with("#") {
-                eprintln!("ERR: Jump cannot be immediate, expect address");
-                return None;
+                return Some(Err("ERR: Jump cannot be immediate, expect address".to_string()));
             } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
             {
                 addressing_mode = AddressingMode::Relative;
@@ -372,20 +389,19 @@ fn parse_instruction(str: &str) -> Option<Instruction> {
                 _ => None
             };
 
-            branch_condition.map(|branch_condition| Instruction {
+            branch_condition.map(|branch_condition| Ok(Instruction {
                 opcode: Opcode::Jump,
                 data: InstructionData::BranchCondition(branch_condition),
                 size: 3,
                 linked_data,
                 addressing_mode,
-            })
+            }))
         }
         _ => None,
     }
 }
 
 pub struct IntermediateRepresentation<'a> {
-    labels: HashMap<&'a str, u16>,
     instructions: HashMap<u16, Instruction<'a>>,
 }
 
@@ -396,14 +412,32 @@ impl<'a> IntermediateRepresentation<'a> {
 
         let mut current_addr: u16 = 0;
         for line in str.lines() {
+            // Skipping empty line
+            if line.trim().is_empty() {
+                continue;
+            }
+
             if let Some(label) = parse_label_name(line) {
                 labels.insert(label, current_addr);
-            } else if let Some(org_addr) = parse_org_flag(line) {
+                println!("INFO: label {} at current_addr {:#02x}", label, current_addr);
+            } else if let Some(org_addr_parse) = parse_org_flag(line) {
+                if let Ok(org_addr) = org_addr_parse { 
                 current_addr = org_addr;
-            } else if let Some(instruction) = parse_instruction(line) {
-                let incr_addr = instruction.size;
-                instructions.insert(current_addr, instruction);
-                current_addr += incr_addr;
+                } else if let Err(err) = org_addr_parse {
+                    eprintln!("ERR: on line of code: {}", line);
+                    eprintln!("{}", err);
+                    return None;
+                }
+            } else if let Some(instruction_parse) = parse_instruction(line) {
+                if let Ok(instruction) = instruction_parse { 
+                    let incr_addr = instruction.size;
+                    instructions.insert(current_addr, instruction);
+                    current_addr += incr_addr;
+                } else if let Err(err) = instruction_parse {
+                    eprintln!("ERR: on line of code: {}", line);
+                    eprintln!("{}", err);
+                    return None;
+                }
             } else {
                 eprintln!("ERR: Unknown line of code: {}", line);
                 return None;
@@ -423,7 +457,6 @@ impl<'a> IntermediateRepresentation<'a> {
         }
 
         Some(Self {
-            labels,
             instructions,
         })
     }
@@ -432,7 +465,7 @@ impl<'a> IntermediateRepresentation<'a> {
         let min_instruction_address = self.instructions.keys().min().unwrap();
         let max_instruction_address = self.instructions.keys().max().unwrap();
 
-        max_instruction_address - min_instruction_address + 1
+        (max_instruction_address - min_instruction_address) + self.instructions[max_instruction_address].size
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -443,13 +476,14 @@ impl<'a> IntermediateRepresentation<'a> {
             vec
         };
         let mut memory = vec![0; size];
+        println!("INFO: Memory of size {}", size);
 
         let offset_addr = addr_map[0];
         for addr in addr_map {
             let current_instruction = self.instructions.get(addr).unwrap();
             let bytes_rep = current_instruction.to_bytes();
             let bytes_addr_slice = (addr - offset_addr) as usize
-                ..(addr - offset_addr + current_instruction.size) as usize;
+                ..((addr - offset_addr) as usize + bytes_rep.len());
 
             memory[bytes_addr_slice].copy_from_slice(bytes_rep.as_slice());
         }
