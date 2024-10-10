@@ -1,28 +1,11 @@
-use clap::{Args, Parser, Subcommand};
+use clap::Parser;
 use std::fs;
 use std::io::prelude::*;
 
+mod cli;
+use cli::*;
 mod token;
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-#[command(propagate_version = true)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Assemble(AssembleArgs),
-}
-
-#[derive(Args)]
-struct AssembleArgs {
-    source: String,
-    #[arg(short, long)]
-    output: Option<String>,
-}
 const DEFAULT_OUTPUT_NAME: &str = "out.bin";
 
 fn main() {    
