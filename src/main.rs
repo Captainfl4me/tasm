@@ -4,7 +4,7 @@ use std::io::prelude::*;
 
 mod cli;
 use cli::*;
-mod token;
+mod parser;
 
 const DEFAULT_OUTPUT_NAME: &str = "out.bin";
 
@@ -17,7 +17,7 @@ fn main() {
 
             println!("Assembling: {}", args.source);
             let source_code = fs::read_to_string(args.source).unwrap();
-            if let Some(intermediate_representation) = token::IntermediateRepresentation::new(source_code.as_str()) {
+            if let Some(intermediate_representation) = parser::IntermediateRepresentation::new(source_code.as_str()) {
             let mut output_file = fs::File::create(output_file_path).unwrap();
             output_file.write_all(intermediate_representation.to_bytes().as_slice()).unwrap();
             } else {
@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn test_break() {
-        let intermediate_representation_opt = token::IntermediateRepresentation::new("halt\n");
+        let intermediate_representation_opt = parser::IntermediateRepresentation::new("halt\n");
         assert!(intermediate_representation_opt.is_some());
 
         let intermediate_representation = intermediate_representation_opt.unwrap();
@@ -43,17 +43,17 @@ mod tests {
 
     #[test]
     fn test_org() {
-        let intermediate_representation_opt = token::IntermediateRepresentation::new(".org $8000\nhalt\n");
+        let intermediate_representation_opt = parser::IntermediateRepresentation::new(".org $8000\nhalt\n");
         assert!(intermediate_representation_opt.is_some());
 
-        // let intermediate_representation = intermediate_representation_opt.unwrap();
-        // assert_eq!(intermediate_representation.bytes_size(), 1);
-        // assert_eq!(intermediate_representation.to_bytes(), vec![0]);
+        let intermediate_representation = intermediate_representation_opt.unwrap();
+        assert_eq!(intermediate_representation.bytes_size(), 1);
+        assert_eq!(intermediate_representation.to_bytes(), vec![0]);
     }
 
     #[test]
     fn test_load_immediate() {
-        let intermediate_representation_opt = token::IntermediateRepresentation::new("load rx,#255\r\nhalt\r\n");
+        let intermediate_representation_opt = parser::IntermediateRepresentation::new("load rx,#255\r\nhalt\r\n");
         assert!(intermediate_representation_opt.is_some());
 
         let intermediate_representation = intermediate_representation_opt.unwrap();
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_load_relative() {
-        let intermediate_representation_opt = token::IntermediateRepresentation::new("load rx,$1234\r\nhalt\r\n");
+        let intermediate_representation_opt = parser::IntermediateRepresentation::new("load rx,$1234\r\nhalt\r\n");
         assert!(intermediate_representation_opt.is_some());
 
         let intermediate_representation = intermediate_representation_opt.unwrap();
