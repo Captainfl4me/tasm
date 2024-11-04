@@ -66,21 +66,21 @@ pub enum InstructionData {
     DoubleRegisters(Registers, Registers),
 }
 
-pub enum InstructionLinkedData<'a> {
+pub enum InstructionLinkedData {
     Immediate(u8),
     Relative(u16),
-    NotResolvedRelative(&'a str),
+    NotResolvedRelative(String),
 }
 
-pub struct Instruction<'a> {
+pub struct Instruction {
     pub opcode: Opcode,
     pub addressing_mode: AddressingMode,
     pub data: InstructionData,
     pub size: u16,
-    pub linked_data: Option<InstructionLinkedData<'a>>,
+    pub linked_data: Option<InstructionLinkedData>,
 }
-impl<'a> Instruction<'a> {
-    pub fn new(str: &'a str) -> Result<Option<Self>, String> {
+impl Instruction {
+    pub fn new(str: &str) -> Result<Option<Self>, String> {
         let (keyword, data) = {
             let line_splited = str.split(" ").collect::<Vec<&str>>();
             let data = line_splited.get(1).map(|s| s.trim_ascii());
@@ -122,7 +122,7 @@ impl<'a> Instruction<'a> {
                     linked_data = InstructionLinkedData::Relative(value);
                 } else {
                     addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
+                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii().to_string());
                 }
                 Ok(Some(Instruction {
                     opcode: Opcode::Load,
@@ -191,7 +191,7 @@ impl<'a> Instruction<'a> {
                     linked_data = InstructionLinkedData::Relative(value);
                 } else {
                     addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii());
+                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii().to_string());
                 }
                 Ok(Some(Instruction {
                     opcode: Opcode::Store,
@@ -281,7 +281,7 @@ impl<'a> Instruction<'a> {
                 } else {
                     addressing_mode = AddressingMode::Relative;
                     linked_data = Some(InstructionLinkedData::NotResolvedRelative(
-                        data.unwrap(),
+                        data.unwrap().to_string(),
                     ));
                 }
 

@@ -15,11 +15,9 @@ fn main() {
         Commands::Assemble(args) => {
             let output_file_path = args.output.unwrap_or(DEFAULT_OUTPUT_NAME.to_string());
 
-            println!("Assembling: {}", args.source);
-            let source_code = fs::read_to_string(args.source).unwrap();
-            if let Some(intermediate_representation) = parser::IntermediateRepresentation::new(source_code.as_str()) {
+            if let Some(intermediate_representation) = parser::IntermediateRepresentation::new(&args.source) {
             let mut output_file = fs::File::create(output_file_path).unwrap();
-            output_file.write_all(intermediate_representation.to_bytes().as_slice()).unwrap();
+                output_file.write_all(intermediate_representation.to_bytes().as_slice()).unwrap();
             } else {
                 eprintln!("ERR: Cannot parse source code!");
             }
@@ -32,43 +30,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_break() {
-        let intermediate_representation_opt = parser::IntermediateRepresentation::new("halt\n");
+    fn test_file_assembling() {
+        let intermediate_representation_opt = parser::IntermediateRepresentation::new("./test/test.tasm");
         assert!(intermediate_representation_opt.is_some());
 
         let intermediate_representation = intermediate_representation_opt.unwrap();
-        assert_eq!(intermediate_representation.bytes_size(), 1);
-        assert_eq!(intermediate_representation.to_bytes(), vec![0]);
-    }
-
-    #[test]
-    fn test_org() {
-        let intermediate_representation_opt = parser::IntermediateRepresentation::new(".org $8000\nhalt\n");
-        assert!(intermediate_representation_opt.is_some());
-
-        let intermediate_representation = intermediate_representation_opt.unwrap();
-        assert_eq!(intermediate_representation.bytes_size(), 1);
-        assert_eq!(intermediate_representation.to_bytes(), vec![0]);
-    }
-
-    #[test]
-    fn test_load_immediate() {
-        let intermediate_representation_opt = parser::IntermediateRepresentation::new("load rx,#255\r\nhalt\r\n");
-        assert!(intermediate_representation_opt.is_some());
-
-        let intermediate_representation = intermediate_representation_opt.unwrap();
-        assert_eq!(intermediate_representation.bytes_size(), 3);
-        assert_eq!(intermediate_representation.to_bytes(), vec![0b00010001, 255, 0]);
-    }
-
-    #[test]
-    fn test_load_relative() {
-        let intermediate_representation_opt = parser::IntermediateRepresentation::new("load rx,$1234\r\nhalt\r\n");
-        assert!(intermediate_representation_opt.is_some());
-
-        let intermediate_representation = intermediate_representation_opt.unwrap();
-        assert_eq!(intermediate_representation.bytes_size(), 4);
-        assert_eq!(intermediate_representation.to_bytes(), vec![0b00011001, 0x34, 0x12, 0]);
+        assert_eq!(intermediate_representation.bytes_size(), 6);
+        assert_eq!(intermediate_representation.to_bytes(), vec![0b00011001, 0x34, 0x12, 0b00010001, 255, 0]);
     }
 }
 

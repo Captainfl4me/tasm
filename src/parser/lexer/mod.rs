@@ -9,10 +9,10 @@ pub use flag::*;
 
 use generic::trim_line;
 
-pub enum TokenType<'a> {
-    Instruction(Instruction<'a>),
+pub enum TokenType {
+    Instruction(Instruction),
     Flag(Flag),
-    Label(Label<'a>),
+    Label(Label),
 }
 
 pub fn lex_line(line: &str) -> Result<Option<TokenType>, String> {

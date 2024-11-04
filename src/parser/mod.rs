@@ -1,19 +1,44 @@
 use std::collections::HashMap;
+use std::fs::{read_to_string, exists};
+use std::path::PathBuf;
 
 mod lexer;
 use lexer::*;
 
-pub struct IntermediateRepresentation<'a> {
-    instructions: HashMap<u16, Instruction<'a>>,
+pub struct IntermediateRepresentation {
+    labels: HashMap<String, u16>,
+    instructions: HashMap<u16, Instruction>,
 }
 
-impl<'a> IntermediateRepresentation<'a> {
-    pub fn new(str: &'a str) -> Option<Self> {
-        let mut labels: HashMap<&'a str, u16> = HashMap::new();
-        let mut instructions: HashMap<u16, Instruction<'a>> = HashMap::new();
+impl IntermediateRepresentation {
+    pub fn new(str: &str) -> Option<Self> {
+        IntermediateRepresentation::parse(str, 0)
+    }
 
-        let mut current_addr: u16 = 0;
-        for (line_index, line_raw) in str.lines().enumerate() {
+    fn parse(str: &str, offset_addr: u16) -> Option<Self> {
+        let file_path = exists(str);
+        if let Ok(exist) = file_path {
+            if !exist {
+                eprintln!("ERR: Path does not exist: {}", str);
+                return None;
+            }
+        } else {
+            eprintln!("ERR: Path cannot be determine: {}", str);
+            return None;
+        }
+
+        let source_code = read_to_string(str).unwrap();
+        let parent_dir_path = {
+            let mut path = PathBuf::from(str);
+            path.pop();
+            path
+        };
+
+        let mut labels: HashMap<String, u16> = HashMap::new();
+        let mut instructions: HashMap<u16, Instruction> = HashMap::new();
+
+        let mut current_addr: u16 = offset_addr;
+        for (line_index, line_raw) in source_code.lines().enumerate() {
             match lex_line(line_raw) {
                 Ok(token_opt) => {
                     if let Some(token) = token_opt {
@@ -27,11 +52,23 @@ impl<'a> IntermediateRepresentation<'a> {
                                 match flag {
                                     Flag::Org(addr) => {
                                         current_addr = addr;
+                                    },
+                                    Flag::Include(path_str) => {
+                                        let mut include_full_path = parent_dir_path.clone();
+                                        include_full_path.push(path_str);
+                                        let path_str = include_full_path.to_str().unwrap();
+                                        println!("INFO: Compiling file {}", path_str);
+                                        let nested_representation_opt = IntermediateRepresentation::parse(path_str, current_addr);
+                                        if let Some(nested_representation) = nested_representation_opt {
+                                            current_addr += nested_representation.bytes_size();
+                                            labels.extend(nested_representation.labels);
+                                            instructions.extend(nested_representation.instructions);
+                                        }
                                     }
                                 }
                             },
                             TokenType::Label(label) => {
-                                labels.insert(label.name, current_addr);
+                                labels.insert(label.name.to_string(), current_addr);
                                 println!("INFO: label {} at current_addr {:#02x}", label.name, current_addr);
                             },
                         }
@@ -47,27 +84,31 @@ impl<'a> IntermediateRepresentation<'a> {
         }
 
         for instruction in instructions.values_mut() {
-            if let Some(InstructionLinkedData::NotResolvedRelative(label)) = instruction.linked_data
+            if let Some(InstructionLinkedData::NotResolvedRelative(label)) = &instruction.linked_data
             {
                 if let Some(label_addr) = labels.get(label) {
                     instruction.linked_data = Some(InstructionLinkedData::Relative(*label_addr));
                 } else {
                     eprintln!("ERR: Label {} didn't exist!", label);
-                    return None;
                 }
             }
         }
 
         Some(Self {
+            labels,
             instructions,
         })
     }
 
     pub fn bytes_size(&self) -> u16 {
-        let min_instruction_address = self.instructions.keys().min().unwrap();
-        let max_instruction_address = self.instructions.keys().max().unwrap();
+        if self.instructions.is_empty() {
+            0
+        } else {
+            let min_instruction_address = self.instructions.keys().min().unwrap();
+            let max_instruction_address = self.instructions.keys().max().unwrap();
 
-        (max_instruction_address - min_instruction_address) + self.instructions[max_instruction_address].size
+            (max_instruction_address - min_instruction_address) + self.instructions[max_instruction_address].size
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
