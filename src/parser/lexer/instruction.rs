@@ -1,6 +1,6 @@
 use super::generic::parse_number;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum Opcode {
     Break = 0,
@@ -13,14 +13,14 @@ pub enum Opcode {
     Jump = 7,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum AddressingMode {
     Immediate = 0,
     Relative = 1,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum Registers {
     Ra = 0,
@@ -29,7 +29,7 @@ pub enum Registers {
     Rb = 3,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum MathOperand {
     Increment = 0,
@@ -42,7 +42,7 @@ pub enum MathOperand {
     ShiftRight = 7,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum BranchCondition {
     NoCondition = 0,
@@ -56,7 +56,7 @@ pub enum BranchCondition {
     OverflowFlagSet = 8,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum InstructionData {
     NoData = 0,
@@ -84,7 +84,7 @@ impl Instruction {
         let (keyword, data) = {
             let line_splited = str.split(" ").collect::<Vec<&str>>();
             let data = line_splited.get(1).map(|s| s.trim_ascii());
-            
+
             (line_splited[0], data)
         };
 
@@ -97,43 +97,58 @@ impl Instruction {
                 linked_data: None,
             })),
             "load" => {
-                let (register_str, data_str) = data.unwrap().split_once(",").unwrap();
-                let register: Option<Registers> = match register_str {
-                    "rx" => Some(Registers::Rx),
-                    "ry" => Some(Registers::Ry),
-                    "ra" => Some(Registers::Ra),
-                    "rb" => Some(Registers::Rb),
-                    _ => None,
-                };
-                if register.is_none() {
-                    return Err(format!("Unknow register: {}", register_str))
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
                 }
 
-                let addressing_mode;
-                let linked_data;
-                let data_trimmed = data_str.trim_ascii().to_string();
-                if data_trimmed.starts_with("#") {
-                    let value = parse_number::<u8>(data_trimmed.replace("#", "").as_str()).unwrap();
-                    addressing_mode = AddressingMode::Immediate;
-                    linked_data = InstructionLinkedData::Immediate(value);
-                } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
-                {
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::Relative(value);
+                if let Some((register_str, data_str)) = data.unwrap().split_once(",") {
+                    let register: Option<Registers> = match register_str {
+                        "rx" => Some(Registers::Rx),
+                        "ry" => Some(Registers::Ry),
+                        "ra" => Some(Registers::Ra),
+                        "rb" => Some(Registers::Rb),
+                        _ => None,
+                    };
+                    if register.is_none() {
+                        return Err(format!("Unknow register: {}", register_str));
+                    }
+
+                    let addressing_mode;
+                    let linked_data;
+                    let data_trimmed = data_str.trim_ascii().to_string();
+                    if data_trimmed.starts_with("#") {
+                        if let Some(value) =
+                            parse_number::<u8>(data_trimmed.replace("#", "").as_str())
+                        {
+                            addressing_mode = AddressingMode::Immediate;
+                            linked_data = InstructionLinkedData::Immediate(value);
+                        } else {
+                            return Err("Immediate value cannot be parsed".to_string());
+                        }
+                    } else if let Some(value) =
+                        parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+                    {
+                        addressing_mode = AddressingMode::Relative;
+                        linked_data = InstructionLinkedData::Relative(value);
+                    } else {
+                        addressing_mode = AddressingMode::Relative;
+                        linked_data = InstructionLinkedData::NotResolvedRelative(
+                            data_str.trim_ascii().to_string(),
+                        );
+                    }
+                    Ok(Some(Instruction {
+                        opcode: Opcode::Load,
+                        data: InstructionData::Registers(register.unwrap()),
+                        size: match addressing_mode {
+                            AddressingMode::Relative => 3,
+                            AddressingMode::Immediate => 2,
+                        },
+                        linked_data: Some(linked_data),
+                        addressing_mode,
+                    }))
                 } else {
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii().to_string());
+                    Err("".to_string())
                 }
-                Ok(Some(Instruction {
-                    opcode: Opcode::Load,
-                    data: InstructionData::Registers(register.unwrap()),
-                    size: match addressing_mode {
-                        AddressingMode::Relative => 3,
-                        AddressingMode::Immediate => 2,
-                    },
-                    linked_data: Some(linked_data),
-                    addressing_mode,
-                }))
             }
             "tf" => {
                 let (register_str_1, register_str_2) = data.unwrap().split_once(",").unwrap();
@@ -145,7 +160,7 @@ impl Instruction {
                     _ => None,
                 };
                 if register_1.is_none() {
-                    return Err(format!("Unknow register: {}", register_str_1))
+                    return Err(format!("Unknow register: {}", register_str_1));
                 }
 
                 let register_2: Option<Registers> = match register_str_2 {
@@ -156,13 +171,16 @@ impl Instruction {
                     _ => None,
                 };
                 if register_1.is_none() {
-                    return Err(format!("Unknow register: {}", register_str_2))
+                    return Err(format!("Unknow register: {}", register_str_2));
                 }
 
                 Ok(Some(Instruction {
                     opcode: Opcode::Transfer,
                     addressing_mode: AddressingMode::Immediate,
-                    data: InstructionData::DoubleRegisters(register_1.unwrap(), register_2.unwrap()),
+                    data: InstructionData::DoubleRegisters(
+                        register_1.unwrap(),
+                        register_2.unwrap(),
+                    ),
                     size: 1,
                     linked_data: None,
                 }))
@@ -177,7 +195,7 @@ impl Instruction {
                     _ => None,
                 };
                 if register.is_none() {
-                    return Err(format!("Unknow register: {}", register_str))
+                    return Err(format!("Unknow register: {}", register_str));
                 }
 
                 let addressing_mode;
@@ -185,13 +203,16 @@ impl Instruction {
                 let data_trimmed = data_str.trim_ascii().to_string();
                 if data_trimmed.starts_with("#") {
                     return Err("Store cannot be immediate, expect address".to_string());
-                } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+                } else if let Some(value) =
+                    parse_number::<u16>(data_trimmed.replace("#", "").as_str())
                 {
                     addressing_mode = AddressingMode::Relative;
                     linked_data = InstructionLinkedData::Relative(value);
                 } else {
                     addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(data_str.trim_ascii().to_string());
+                    linked_data = InstructionLinkedData::NotResolvedRelative(
+                        data_str.trim_ascii().to_string(),
+                    );
                 }
                 Ok(Some(Instruction {
                     opcode: Opcode::Store,
@@ -211,7 +232,7 @@ impl Instruction {
                     _ => None,
                 };
                 if register.is_none() {
-                    return Err(format!("Unknow register: {}", register_str))
+                    return Err(format!("Unknow register: {}", register_str));
                 }
 
                 Ok(Some(Instruction {
@@ -232,7 +253,7 @@ impl Instruction {
                     _ => None,
                 };
                 if register.is_none() {
-                    return Err(format!("Unknow register: {}", register_str))
+                    return Err(format!("Unknow register: {}", register_str));
                 }
 
                 Ok(Some(Instruction {
@@ -245,7 +266,10 @@ impl Instruction {
             }
             "incr" | "add" | "sub" | "and" | "or" | "eor" | "shift_right" | "shift_left" => {
                 if data.is_some() {
-                    return Err("Math operand only apply between fixed register from file (RA and RB)".to_string());
+                    return Err(
+                        "Math operand only apply between fixed register from file (RA and RB)"
+                            .to_string(),
+                    );
                 }
 
                 let math_op = match keyword {
@@ -274,7 +298,8 @@ impl Instruction {
                 let data_trimmed = data.unwrap().to_string();
                 if data_trimmed.starts_with("#") {
                     return Err("Jump cannot be immediate, expect address".to_string());
-                } else if let Some(value) = parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+                } else if let Some(value) =
+                    parse_number::<u16>(data_trimmed.replace("#", "").as_str())
                 {
                     addressing_mode = AddressingMode::Relative;
                     linked_data = Some(InstructionLinkedData::Relative(value));
@@ -295,7 +320,7 @@ impl Instruction {
                     "bns" => Some(BranchCondition::NegativeFlagSet),
                     "boc" => Some(BranchCondition::OverflowFlagClear),
                     "bos" => Some(BranchCondition::OverflowFlagSet),
-                    _ => None
+                    _ => None,
                 };
 
                 Ok(Some(Instruction {
@@ -339,5 +364,56 @@ impl Instruction {
         }
 
         bytes_vec
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrong_inst() {
+        let inst = Instruction::new("azerty");
+        assert!(inst.is_ok());
+        assert!(inst.ok().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_halt() {
+        let inst = Instruction::new("halt");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0]);
+        assert_eq!(inst.size, 1);
+    }
+
+    #[test]
+    fn test_load() {
+        let inst = Instruction::new("load");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("load aze");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("load rx,#300");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("load ra,#5");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![1, 5]);
+        assert_eq!(inst.size, 2);
+
+        let inst = Instruction::new("load ra,$abac");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b1001, 0xac, 0xab]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("load ra,flag_test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b1001, 0, 0]);
+        assert_eq!(inst.size, 3);
     }
 }
