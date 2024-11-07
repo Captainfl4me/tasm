@@ -1,4 +1,3 @@
-use std::fs;
 use super::generic::parse_number;
 
 #[derive(Debug, PartialEq)]
@@ -47,6 +46,15 @@ impl Flag {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_empty_flag() {
+        let new_instance = Flag::new(". $8000");
+        assert!(new_instance.is_err());
+
+        let new_instance = Flag::new(".");
+        assert!(new_instance.is_err());
+    }
 
     #[test]
     fn test_org_flag() {
