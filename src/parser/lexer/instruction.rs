@@ -196,41 +196,50 @@ impl Instruction {
                 }
             }
             "store" => {
-                let (register_str, data_str) = data.unwrap().split_once(",").unwrap();
-                let register: Option<Registers> = match register_str {
-                    "rx" => Some(Registers::Rx),
-                    "ry" => Some(Registers::Ry),
-                    "ra" => Some(Registers::Ra),
-                    "rb" => Some(Registers::Rb),
-                    _ => None,
-                };
-                if register.is_none() {
-                    return Err(format!("Unknow register: {}", register_str));
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
                 }
+                if let Some((register_str, data_str)) = data.unwrap().split_once(",") {
+                    let register: Option<Registers> = match register_str {
+                        "rx" => Some(Registers::Rx),
+                        "ry" => Some(Registers::Ry),
+                        "ra" => Some(Registers::Ra),
+                        "rb" => Some(Registers::Rb),
+                        _ => None,
+                    };
+                    if register.is_none() {
+                        return Err(format!("Unknow register: {}", register_str));
+                    }
+                    if data_str.is_empty() {
+                        return Err("Value of address is none".to_string());
+                    }
 
-                let addressing_mode;
-                let linked_data;
-                let data_trimmed = data_str.trim_ascii().to_string();
-                if data_trimmed.starts_with("#") {
-                    return Err("Store cannot be immediate, expect address".to_string());
-                } else if let Some(value) =
-                    parse_number::<u16>(data_trimmed.replace("#", "").as_str())
-                {
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::Relative(value);
+                    let addressing_mode;
+                    let linked_data;
+                    let data_trimmed = data_str.trim_ascii().to_string();
+                    if data_trimmed.starts_with("#") {
+                        return Err("Store cannot be immediate, expect address".to_string());
+                    } else if let Some(value) =
+                        parse_number::<u16>(data_trimmed.replace("#", "").as_str())
+                    {
+                        addressing_mode = AddressingMode::Relative;
+                        linked_data = InstructionLinkedData::Relative(value);
+                    } else {
+                        addressing_mode = AddressingMode::Relative;
+                        linked_data = InstructionLinkedData::NotResolvedRelative(
+                            data_str.trim_ascii().to_string(),
+                        );
+                    }
+                    Ok(Some(Instruction {
+                        opcode: Opcode::Store,
+                        data: InstructionData::Registers(register.unwrap()),
+                        size: 3,
+                        linked_data: Some(linked_data),
+                        addressing_mode,
+                    }))
                 } else {
-                    addressing_mode = AddressingMode::Relative;
-                    linked_data = InstructionLinkedData::NotResolvedRelative(
-                        data_str.trim_ascii().to_string(),
-                    );
+                    Err("format STORE <reg>,<address> is not matched!".to_string())
                 }
-                Ok(Some(Instruction {
-                    opcode: Opcode::Store,
-                    data: InstructionData::Registers(register.unwrap()),
-                    size: 3,
-                    linked_data: Some(linked_data),
-                    addressing_mode,
-                }))
             }
             "push" => {
                 let register_str = data.unwrap();
@@ -467,5 +476,35 @@ mod tests {
         let inst = inst.ok().unwrap().unwrap();
         assert_eq!(inst.to_bytes(), vec![0b00000010]);
         assert_eq!(inst.size, 1);
+    }
+
+    #[test]
+    fn test_store() {
+        let inst = Instruction::new("store");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("store rx,");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("store rx,#5");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("store rz,#5");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("store rz,flag_test");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("store ra,flag_test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00001011, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("store ra,$abac");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00001011, 0xac, 0xab]);
+        assert_eq!(inst.size, 3);
     }
 }
