@@ -112,6 +112,9 @@ impl Instruction {
                     if register.is_none() {
                         return Err(format!("Unknow register: {}", register_str));
                     }
+                    if data_str.is_empty() {
+                        return Err("Value to load is none".to_string());
+                    }
 
                     let addressing_mode;
                     let linked_data;
@@ -147,43 +150,50 @@ impl Instruction {
                         addressing_mode,
                     }))
                 } else {
-                    Err("".to_string())
+                    Err("format LOAD <reg>,<#value/address> is not matched!".to_string())
                 }
             }
             "tf" => {
-                let (register_str_1, register_str_2) = data.unwrap().split_once(",").unwrap();
-                let register_1: Option<Registers> = match register_str_1 {
-                    "rx" => Some(Registers::Rx),
-                    "ry" => Some(Registers::Ry),
-                    "ra" => Some(Registers::Ra),
-                    "rb" => Some(Registers::Rb),
-                    _ => None,
-                };
-                if register_1.is_none() {
-                    return Err(format!("Unknow register: {}", register_str_1));
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
                 }
 
-                let register_2: Option<Registers> = match register_str_2 {
-                    "rx" => Some(Registers::Rx),
-                    "ry" => Some(Registers::Ry),
-                    "ra" => Some(Registers::Ra),
-                    "rb" => Some(Registers::Rb),
-                    _ => None,
-                };
-                if register_1.is_none() {
-                    return Err(format!("Unknow register: {}", register_str_2));
-                }
+                if let Some((register_str_1, register_str_2)) = data.unwrap().split_once(",") {
+                    let register_1: Option<Registers> = match register_str_1 {
+                        "rx" => Some(Registers::Rx),
+                        "ry" => Some(Registers::Ry),
+                        "ra" => Some(Registers::Ra),
+                        "rb" => Some(Registers::Rb),
+                        _ => None,
+                    };
+                    if register_1.is_none() {
+                        return Err(format!("Unknow register: {}", register_str_1));
+                    }
 
-                Ok(Some(Instruction {
-                    opcode: Opcode::Transfer,
-                    addressing_mode: AddressingMode::Immediate,
-                    data: InstructionData::DoubleRegisters(
-                        register_1.unwrap(),
-                        register_2.unwrap(),
-                    ),
-                    size: 1,
-                    linked_data: None,
-                }))
+                    let register_2: Option<Registers> = match register_str_2 {
+                        "rx" => Some(Registers::Rx),
+                        "ry" => Some(Registers::Ry),
+                        "ra" => Some(Registers::Ra),
+                        "rb" => Some(Registers::Rb),
+                        _ => None,
+                    };
+                    if register_2.is_none() {
+                        return Err(format!("Unknow register: {}", register_str_2));
+                    }
+
+                    Ok(Some(Instruction {
+                        opcode: Opcode::Transfer,
+                        addressing_mode: AddressingMode::Immediate,
+                        data: InstructionData::DoubleRegisters(
+                            register_1.unwrap(),
+                            register_2.unwrap(),
+                        ),
+                        size: 1,
+                        linked_data: None,
+                    }))
+                } else {
+                    Err("format TF <reg>,<reg> is not matched!".to_string())
+                }
             }
             "store" => {
                 let (register_str, data_str) = data.unwrap().split_once(",").unwrap();
@@ -395,6 +405,12 @@ mod tests {
         let inst = Instruction::new("load aze");
         assert!(inst.is_err());
 
+        let inst = Instruction::new("load rz,#300");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("load rx,");
+        assert!(inst.is_err());
+
         let inst = Instruction::new("load rx,#300");
         assert!(inst.is_err());
 
@@ -415,5 +431,41 @@ mod tests {
         let inst = inst.ok().unwrap().unwrap();
         assert_eq!(inst.to_bytes(), vec![0b1001, 0, 0]);
         assert_eq!(inst.size, 3);
+    }
+
+    #[test]
+    fn test_transfer() {
+        let inst = Instruction::new("tf");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("tf aze");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("tf rx,");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("tf rx,rz");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("tf rz,rx");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("tf rx,ry");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b10010010]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("tf ra,rb");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b11000010]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("tf ra,ra");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00000010]);
+        assert_eq!(inst.size, 1);
     }
 }
