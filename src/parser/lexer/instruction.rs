@@ -89,13 +89,19 @@ impl Instruction {
         };
 
         match keyword {
-            "halt" => Ok(Some(Instruction {
+            "halt" => {
+                if data.is_some() {
+                    return Err("Data part of instruction should be none".to_string());
+                }
+
+                Ok(Some(Instruction {
                 opcode: Opcode::Break,
                 addressing_mode: AddressingMode::Immediate,
                 data: InstructionData::NoData,
                 size: 1,
                 linked_data: None,
-            })),
+                }))
+            },
             "load" => {
                 if data.is_none() {
                     return Err("Data part of instruction is none".to_string());
@@ -199,6 +205,7 @@ impl Instruction {
                 if data.is_none() {
                     return Err("Data part of instruction is none".to_string());
                 }
+
                 if let Some((register_str, data_str)) = data.unwrap().split_once(",") {
                     let register: Option<Registers> = match register_str {
                         "rx" => Some(Registers::Rx),
@@ -242,6 +249,10 @@ impl Instruction {
                 }
             }
             "push" => {
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
+                }
+
                 let register_str = data.unwrap();
                 let register: Option<Registers> = match register_str {
                     "rx" => Some(Registers::Rx),
@@ -263,6 +274,10 @@ impl Instruction {
                 }))
             }
             "pull" => {
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
+                }
+
                 let register_str = data.unwrap();
                 let register: Option<Registers> = match register_str {
                     "rx" => Some(Registers::Rx),
@@ -506,5 +521,77 @@ mod tests {
         let inst = inst.ok().unwrap().unwrap();
         assert_eq!(inst.to_bytes(), vec![0b00001011, 0xac, 0xab]);
         assert_eq!(inst.size, 3);
+    }
+
+    #[test]
+    fn test_push() {
+        let inst = Instruction::new("push");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("push rz");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("push #5");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("push ra");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00000100]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("push rx");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00010100]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("push ry");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00100100]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("push rb");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00110100]);
+        assert_eq!(inst.size, 1);
+    }
+
+    #[test]
+    fn test_pull() {
+        let inst = Instruction::new("pull");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("pull rz");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("pull #5");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("pull ra");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00000101]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("pull rx");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00010101]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("pull ry");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00100101]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("pull rb");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00110101]);
+        assert_eq!(inst.size, 1);
     }
 }
