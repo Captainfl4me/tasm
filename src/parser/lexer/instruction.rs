@@ -54,6 +54,8 @@ pub enum BranchCondition {
     NegativeFlagSet = 6,
     OverflowFlagClear = 7,
     OverflowFlagSet = 8,
+    JumpToSubroutine = 9,
+    ReturnFromSubroutine = 10,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -95,13 +97,13 @@ impl Instruction {
                 }
 
                 Ok(Some(Instruction {
-                opcode: Opcode::Break,
-                addressing_mode: AddressingMode::Immediate,
-                data: InstructionData::NoData,
-                size: 1,
-                linked_data: None,
+                    opcode: Opcode::Break,
+                    addressing_mode: AddressingMode::Immediate,
+                    data: InstructionData::NoData,
+                    size: 1,
+                    linked_data: None,
                 }))
-            },
+            }
             "load" => {
                 if data.is_none() {
                     return Err("Data part of instruction is none".to_string());
@@ -326,7 +328,7 @@ impl Instruction {
                     addressing_mode: AddressingMode::Immediate,
                 }))
             }
-            "jump" | "bcc" | "bcs" | "bzc" | "bzs" | "bnc" | "bns" | "boc" | "bos" => {
+            "jump" | "bcc" | "bcs" | "bzc" | "bzs" | "bnc" | "bns" | "boc" | "bos" | "jsr" => {
                 if data.is_none() {
                     return Err("Data part of instruction is none".to_string());
                 }
@@ -358,6 +360,7 @@ impl Instruction {
                     "bns" => Some(BranchCondition::NegativeFlagSet),
                     "boc" => Some(BranchCondition::OverflowFlagClear),
                     "bos" => Some(BranchCondition::OverflowFlagSet),
+                    "jsr" => Some(BranchCondition::JumpToSubroutine),
                     _ => None,
                 };
 
@@ -367,6 +370,19 @@ impl Instruction {
                     size: 3,
                     linked_data,
                     addressing_mode,
+                }))
+            }
+            "rts" => {
+                if data.is_some() {
+                    return Err("RTS don't accept data as argument".to_string());
+                }
+
+                Ok(Some(Instruction {
+                    opcode: Opcode::Jump,
+                    data: InstructionData::BranchCondition(BranchCondition::ReturnFromSubroutine),
+                    size: 1,
+                    linked_data: None,
+                    addressing_mode: AddressingMode::Immediate,
                 }))
             }
             _ => Ok(None),
@@ -720,5 +736,20 @@ mod tests {
         let inst = inst.ok().unwrap().unwrap();
         assert_eq!(inst.to_bytes(), vec![0b10001111, 0, 0]);
         assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("jsr test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b10011111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("rts $0000");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("rts");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b10100111]);
+        assert_eq!(inst.size, 1);
     }
 }
