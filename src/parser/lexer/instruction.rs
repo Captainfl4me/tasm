@@ -327,6 +327,10 @@ impl Instruction {
                 }))
             }
             "jump" | "bcc" | "bcs" | "bzc" | "bzs" | "bnc" | "bns" | "boc" | "bos" => {
+                if data.is_none() {
+                    return Err("Data part of instruction is none".to_string());
+                }
+
                 let addressing_mode;
                 let linked_data;
                 let data_trimmed = data.unwrap().to_string();
@@ -647,5 +651,74 @@ mod tests {
         let inst = inst.ok().unwrap().unwrap();
         assert_eq!(inst.to_bytes(), vec![0b01110110]);
         assert_eq!(inst.size, 1);
+    }
+
+    #[test]
+    fn test_jump() {
+        let inst = Instruction::new("jump");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("jump #5");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("jump $abac");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00001111, 0xac, 0xab]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("jump test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00001111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bcc test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00011111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bcs test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00101111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bzc test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00111111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bzs test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01001111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bnc test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01011111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bns test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01101111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("boc test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01111111, 0, 0]);
+        assert_eq!(inst.size, 3);
+
+        let inst = Instruction::new("bos test");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b10001111, 0, 0]);
+        assert_eq!(inst.size, 3);
     }
 }
