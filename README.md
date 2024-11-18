@@ -150,3 +150,16 @@ rb|B register for ALU
 `[ADDR] -> PC`
 
 `bos [addr]` jump to address if overflow flag is set.
+
+### jsr
+
+`PC+2 -> <stack>`
+`[ADDR] -> PC`
+
+`jsr [addr]` jump to subroutine at address and store PC+2 onto stack.
+
+### rts
+
+`<stack> -> PC`
+
+`rts` return from subroutine by fetching PC value on the stack.
