@@ -119,7 +119,6 @@ impl IntermediateRepresentation {
             vec
         };
         let mut memory = vec![0; size];
-        println!("INFO: Memory of size {}", size);
 
         let offset_addr = addr_map[0];
         for addr in addr_map {

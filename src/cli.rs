@@ -18,4 +18,6 @@ pub struct AssembleArgs {
     pub source: String,
     #[arg(short, long)]
     pub output: Option<String>,
+    #[arg(long)]
+    pub coe: bool,
 }
