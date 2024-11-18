@@ -594,4 +594,58 @@ mod tests {
         assert_eq!(inst.to_bytes(), vec![0b00110101]);
         assert_eq!(inst.size, 1);
     }
+
+    #[test]
+    fn test_math() {
+        let inst = Instruction::new("add ra");
+        assert!(inst.is_err());
+
+        let inst = Instruction::new("incr");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00000110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("add");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00010110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("sub");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00100110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("and");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b00110110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("or");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01000110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("eor");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01010110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("shift_left");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01100110]);
+        assert_eq!(inst.size, 1);
+
+        let inst = Instruction::new("shift_right");
+        assert!(inst.is_ok());
+        let inst = inst.ok().unwrap().unwrap();
+        assert_eq!(inst.to_bytes(), vec![0b01110110]);
+        assert_eq!(inst.size, 1);
+    }
 }
