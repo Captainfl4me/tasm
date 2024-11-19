@@ -64,12 +64,16 @@ impl IntermediateRepresentation {
                                             labels.extend(nested_representation.labels);
                                             instructions.extend(nested_representation.instructions);
                                         }
+                                    },
+                                    Flag::Label((label_name, addr)) => {
+                                        labels.insert(label_name.to_string(), addr);
+                                        println!("INFO: label {} at current_addr {:#06x}", label_name, addr);
                                     }
                                 }
                             },
                             TokenType::Label(label) => {
                                 labels.insert(label.name.to_string(), current_addr);
-                                println!("INFO: label {} at current_addr {:#02x}", label.name, current_addr);
+                                println!("INFO: label {} at current_addr {:#06x}", label.name, current_addr);
                             },
                         }
 
